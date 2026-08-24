@@ -1,0 +1,2 @@
+# icepanel-plugin
+Claude plugin
