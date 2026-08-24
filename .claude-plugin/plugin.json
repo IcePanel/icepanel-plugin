@@ -1,0 +1,18 @@
+{
+  "name": "icepanel",
+  "displayName": "IcePanel",
+  "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, and Level 1/2/3 diagrams.",
+  "version": "1.0.0",
+  "author": {
+    "name": "IcePanel",
+    "url": "https://icepanel.io"
+  },
+  "homepage": "https://developer.icepanel.io",
+  "keywords": [
+    "icepanel",
+    "c4 model",
+    "architecture",
+    "diagrams",
+    "devtools"
+  ]
+}
