@@ -1,0 +1,37 @@
+{
+  "name": "icepanel-plugins",
+  "description": "Claude Code plugins for working with IcePanel architecture landscapes.",
+  "version": "1.0.0",
+  "owner": {
+    "name": "IcePanel",
+    "url": "https://icepanel.io"
+  },
+  "plugins": [
+    {
+      "name": "icepanel",
+      "source": "./",
+      "displayName": "IcePanel",
+      "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, and Level 1/2/3 diagrams.",
+      "version": "1.0.0",
+      "author": {
+        "name": "IcePanel",
+        "url": "https://icepanel.io"
+      },
+      "homepage": "https://developer.icepanel.io",
+      "repository": "https://github.com/icepanel/icepanel-plugins",
+      "category": "architecture",
+      "keywords": [
+        "icepanel",
+        "c4 model",
+        "architecture",
+        "diagrams",
+        "modelling",
+        "documentation",
+        "devtools"
+      ],
+      "skills": [
+        "./creating-c4-diagrams/skills/"
+      ]
+    }
+  ]
+}
