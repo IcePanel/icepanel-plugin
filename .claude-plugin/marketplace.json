@@ -1,7 +1,7 @@
 {
   "name": "icepanel-plugins",
   "description": "Claude Code plugins for working with IcePanel architecture landscapes.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": {
     "name": "IcePanel",
     "url": "https://icepanel.io"
@@ -11,8 +11,8 @@
       "name": "icepanel",
       "source": "./",
       "displayName": "IcePanel",
-      "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, and Level 1/2/3 diagrams.",
-      "version": "1.0.0",
+      "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, Level 1/2/3 diagrams. Translate DDD context maps from a sketch.",
+      "version": "1.1.0",
       "author": {
         "name": "IcePanel",
         "url": "https://icepanel.io"
@@ -27,10 +27,13 @@
         "diagrams",
         "modelling",
         "documentation",
+        "ddd",
+        "context map",
         "devtools"
       ],
       "skills": [
-        "./creating-c4-diagrams/skills/"
+        "./skills/creating-c4-diagrams",
+        "./skills/translating-context-maps"
       ]
     }
   ]

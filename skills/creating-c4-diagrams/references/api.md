@@ -1,6 +1,6 @@
 # IcePanel API reference
 
-Base URL `https://api.icepanel.io/v1`. Official docs: https://developer.icepanel.io
+Base URL `https://api.icepanel.io/v1`. Official docs: [https://developer.icepanel.io](https://developer.icepanel.io)
 
 ## Contents
 
@@ -14,11 +14,12 @@ Base URL `https://api.icepanel.io/v1`. Official docs: https://developer.icepanel
 
 ## Important notes
 
-1. **Auth is `X-API-Key` alone.** The reference lists both `X-API-Key` and `Authorization` as required. Sending both returns `401 auth/invalid-access-token`.
+1. **Auth is** `X-API-Key` **alone.** The reference lists both `X-API-Key` and `Authorization` as required. Sending both returns `401 auth/invalid-access-token`.
 2. **"Required, nullable" means the key must be present.** `modelId`, `originId` and `targetId` on a diagram connection are all marked this way: you must send the key, but `null` is an accepted value. That's how a connection with no model behind it becomes possible.
-3. **Import errors don't surface in the initial response.** It returns `in-progress`; per-entity failures appear in the `errors` array once the poll returns `completed`.
-4. **`parentId` in an import file is resolved against that file only.** It matches the `id` of another entry in the same `modelObjects` array — nothing else. Passing a real IcePanel object ID, a domain ID, or a domain name all fail with `Parent <x> not found`. This means top-level objects can only be parented to a `domain` object you include in the import.
+3. **Import errors don't surface in the initial response.** It returns `in-progress`; per-entity failures appear in the `errors` array once the poll returns `completed` or `error`.
+4. `parentId` **in an import file is resolved against that file only.** It matches the `id` of another entry in the same `modelObjects` array — nothing else. Passing a real IcePanel object ID, a domain ID, or a domain name all fail with `Parent <x> not found`. This means top-level objects can only be parented to a `domain` object you include in the import.
 5. **Responses are wrapped in a resource-keyed envelope, and the key is not always the path's plural.** `/catalog/technologies/select` returns `catalogTechnologies`, not `technologies`; `/import` returns `landscapeImport`; `/diagrams/{id}/content` returns `diagramContent`. Read the key from the response rather than assuming it.
+
 
 
 ## Auth and scoping
@@ -71,7 +72,9 @@ That label is how you map your slugs back to IcePanel IDs afterwards.
 
 Poll `GET /landscapes/{landscapeId}/versions/{versionId}/import/{importId}` until `status` is `completed` or `error`. Errors carry `message`, `entityOriginalId` and `entityType`.
 
-Status is **all or nothing**: a single rejected entity gives `status: "error"` with nothing applied. Entity errors carry `entityId` (your import ID) — not `entityOriginalId`, which the published docs suggest.
+`status: "error"` is not all or nothing, entities that validate are still applied, so a failed import can leave partial state behind. Check `GET /model/objects` after an error.
+
+Entity errors carry `entityId` (your import ID) — not `entityOriginalId`, which the published docs suggest.
 
 On a partial re-import, an omitted `icon` is cleared while an omitted `caption`, `description`, `tagIds` or `technologyIds` is preserved.
 
@@ -83,7 +86,9 @@ Required `id`, `name`, `type`. Optional: `parentId`, `description`, `caption`, `
 
 `caption` is the **display description**: a few words rendered under the object's name on every diagram and in the model tree. `description` is the **detailed description**, one or two sentences, read when someone opens the object. They serve different readers — set both on every object. Connections have a `description` but no `caption`.
 
-Hierarchy: `domain` → `actor` | `system` | `group`; `system` → `app` | `store` | `group`; `app` | `store` → `component`.
+Hierarchy (`parentId`): `domain` → `actor` | `system` | `group`; `group` → `group`; `system` → `app` | `store`; `app` | `store` → `component`.
+
+A `system` **cannot** parent a `group`, and a `group` cannot parent anything but another `group`. Group membership for apps and stores is `groupIds` — a list of group IDs on the member object, resolved against the same file like any other reference — while the member's `parentId` stays its `system`. List every group whose boundary should enclose an object, inner and outer both, rather than relying on nesting to imply the outer one. A nested group also cannot be created in the same request as its parent group (`Parent <x> not found`), so import parent groups in one pass and nested groups in a second that re-declares the parent. See **Groups** in `SKILL.md`.
 
 Top-level objects take the `id` of a `domain` entry in the same file as their `parentId` (see note 4 above). The import creates that domain and its `root` object together.
 
@@ -95,18 +100,22 @@ Required `id`, `name`, `direction`, `originId`, `targetId`. Optional: `descripti
 
 Tags require `id`, `name`, `color`, `groupId`. Tag groups require `id`, `name`, `icon`.
 
+`icon` on a tag group is a **named icon string**, not an emoji — `star` is the safe default. Tag `color` is one of the values in [Enum values](#enum-values).
+
 ## Catalog technologies
 
 `GET /catalog/technologies/select` — the shared technology catalog, used to fill `technologyIds` and `icon`. Rows come back under `catalogTechnologies` (see note 5 above), each carrying `id` plus whichever `fields` you asked for.
 
-| Query | Notes |
-|---|---|
-| `fields` | **Required**, repeat as `fields[]=`. Controls the response shape — request only what you need, since the full set is mostly provider plumbing. `id` is always returned regardless. |
-| `search` | Fuzzy match on name. |
-| `filter[name][]` | Exact name match, up to 30. Cheaper and safer than `search` when you know the name. |
-| `filter[type][]`, `filter[provider][]`, `filter[restrictions][]`, `filter[status][]` | Up to 30 each. |
-| `limit` | Defaults to 1000, max 10000. |
-| `cursor` | Paginate via `nextCursor` in the response. |
+
+| Query                                                                                | Notes                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fields`                                                                             | **Required**, repeat as `fields[]=`. Controls the response shape — request only what you need, since the full set is mostly provider plumbing. `id` is always returned regardless. |
+| `search`                                                                             | Fuzzy match on name.                                                                                                                                                               |
+| `filter[name][]`                                                                     | Exact name match, up to 30. Cheaper and safer than `search` when you know the name.                                                                                                |
+| `filter[type][]`, `filter[provider][]`, `filter[restrictions][]`, `filter[status][]` | Up to 30 each.                                                                                                                                                                     |
+| `limit`                                                                              | Defaults to 1000, max 10000.                                                                                                                                                       |
+| `cursor`                                                                             | Paginate via `nextCursor` in the response.                                                                                                                                         |
+
 
 Useful `fields` values: `name`, `description` and `websiteUrl` to judge whether a row is the right technology; `restrictions` and `iconUrlLight`/`iconUrlDark` for where it can go and whether it can be an icon; then `nameShort`, `type`, `provider`, `docsUrl`, `status` as needed. The rest (`awsXmlSelector`, `updatesXmlUrl`, `createdBy`, `rejectionReason`, …) are noise for this job.
 
@@ -121,6 +130,8 @@ Connections take `technologyIds` too, and `connection` appears in `restrictions`
 - `GET /landscapes/{id}/versions/latest/model/objects`
 - `GET /landscapes/{id}/versions/latest/model/connections`
 - `POST`/`PATCH`/`PUT` equivalents exist for single-entity work, but import is better for anything bulk because it's idempotent.
+
+
 
 ## Diagrams
 
@@ -146,7 +157,7 @@ Required: `name`, `type`, `modelId`, `index`. Optional: `description`, `status`,
 }
 ```
 
-`id`, `modelId`, `type`, `shape`, `x` and `y` are required. **`width` and `height` are optional on both shapes — leave them out.** A box then gets IcePanel's default size (256 × 128), and an area is grown around whichever children are on the diagram, with room for its title. Send a size only for a deliberately off-default box; a hand-sized area just goes stale the moment a child moves.
+`id`, `modelId`, `type`, `shape`, `x` and `y` are required. `width` **and** `height` **are optional on both shapes — leave them out.** A box then gets IcePanel's default size (256 × 128), and an area is grown around whichever children are on the diagram, with room for its title. Send a size only for a deliberately off-default box; a hand-sized area just goes stale the moment a child moves.
 
 ### Diagram connection
 
@@ -170,18 +181,22 @@ That is the whole thing. `originId`/`targetId` are model **object** IDs (the obj
 - `PATCH /diagrams/{id}` — update metadata such as `description`
 - `GET /diagrams/{id}/thumbnail` — returns a signed URL, but thumbnails render lazily in the app, so it 404s (`NoSuchKey`) for a diagram nobody has opened. There is no server-side render to verify layout with; check geometry numerically and have a human look.
 
+
+
 ## Enum values
 
-| Field | Values |
-|---|---|
-| model object `type` | `domain`, `root`, `actor`, `system`, `app`, `store`, `component`, `group` |
-| object / connection `status` | `live`, `future`, `deprecated`, `removed` |
-| connection `direction` | `outgoing`, `bidirectional` |
-| diagram `type` | `context-diagram`, `app-diagram`, `component-diagram` |
-| diagram `status` | `current` |
-| diagram object `shape` | `box`, `area` |
-| `lineShape` (optional override) | `curved`, `straight`, `square` |
-| connectors (optional override) | `top-left`, `top-center`, `top-right`, `right-top`, `right-middle`, `right-bottom`, `bottom-right`, `bottom-center`, `bottom-left`, `left-bottom`, `left-middle`, `left-top` |
-| tag `color` | `blue`, `green`, `yellow`, `orange`, `red`, `beaver`, `dark-blue`, `purple`, `pink`, `white`, `grey`, `black` |
+
+| Field                           | Values                                                                                                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| model object `type`             | `domain`, `root`, `actor`, `system`, `app`, `store`, `component`, `group`                                                                                                    |
+| object / connection `status`    | `live`, `future`, `deprecated`, `removed`                                                                                                                                    |
+| connection `direction`          | `outgoing`, `bidirectional`                                                                                                                                                  |
+| diagram `type`                  | `context-diagram`, `app-diagram`, `component-diagram`                                                                                                                        |
+| diagram `status`                | `current`                                                                                                                                                                    |
+| diagram object `shape`          | `box`, `area`                                                                                                                                                                |
+| `lineShape` (optional override) | `curved`, `straight`, `square`                                                                                                                                               |
+| connectors (optional override)  | `top-left`, `top-center`, `top-right`, `right-top`, `right-middle`, `right-bottom`, `bottom-right`, `bottom-center`, `bottom-left`, `left-bottom`, `left-middle`, `left-top` |
+| tag `color`                     | `blue`, `green`, `yellow`, `orange`, `red`, `beaver`, `dark-blue`, `purple`, `pink`, `white`, `grey`, `black`                                                                |
+
 
 There is no code-level (C4 level 4) diagram type.

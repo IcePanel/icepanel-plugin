@@ -160,17 +160,44 @@ def size_of(o):
     return o.get("width") or BOX_W, o.get("height") or BOX_H
 
 
+def overlaps(a, b):
+    """Do two placed objects' rectangles intersect?"""
+    aw, ah = size_of(a)
+    bw, bh = size_of(b)
+    return (a["x"] < b["x"] + bw and b["x"] < a["x"] + aw and
+            a["y"] < b["y"] + bh and b["y"] < a["y"] + ah)
+
+
+def contains(outer, inner):
+    """Does `outer` fully enclose `inner`?"""
+    ow, oh = size_of(outer)
+    iw, ih = size_of(inner)
+    return (inner["x"] >= outer["x"] and inner["y"] >= outer["y"] and
+            inner["x"] + iw <= outer["x"] + ow and inner["y"] + ih <= outer["y"] + oh)
+
+
 def validate(objects, connections, names):
     problems, notes = [], []
     boxes = [o for o in objects if o["shape"] == "box"]
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
             a, b = boxes[i], boxes[j]
-            aw, ah = size_of(a)
-            bw, bh = size_of(b)
-            if (a["x"] < b["x"] + bw and b["x"] < a["x"] + aw and
-                    a["y"] < b["y"] + bh and b["y"] < a["y"] + ah):
+            if overlaps(a, b):
                 problems.append(f"boxes overlap: {names.get(a['modelId'])} / {names.get(b['modelId'])}")
+    # Two boundaries running into each other is the same fault as two boxes doing
+    # it, and just as fatal to reading the diagram. It can only be checked once
+    # IcePanel has computed the extents, so this catches it on verify rather than
+    # on create — sized areas only, auto-sized ones have no geometry yet.
+    # One area fully inside another is nesting, not a collision: a group boundary
+    # sits inside its system boundary on any normal L2, and IcePanel insets each
+    # level itself. Only partial overlap — two boundaries clipping each other's
+    # corners — is the fault worth reporting.
+    sized = [o for o in objects if o["shape"] == "area" and o.get("width") and o.get("height")]
+    for i in range(len(sized)):
+        for j in range(i + 1, len(sized)):
+            a, b = sized[i], sized[j]
+            if overlaps(a, b) and not (contains(a, b) or contains(b, a)):
+                problems.append(f"areas overlap: {names.get(a['modelId'])} / {names.get(b['modelId'])}")
     for ar in [o for o in objects if o["shape"] == "area"]:
         # Areas carry no size: IcePanel grows the boundary around whichever
         # children are on the diagram, so there is no geometry to check. Only a
@@ -222,8 +249,11 @@ def cmd_diagram(args):
             if o.get("h"):
                 obj["height"] = o["h"]
         objects.append(obj)
-        if obj["shape"] == "box":
-            seen[mid] = key
+        # A line can attach to either shape — an L2 system boundary and a context
+        # map's bounded-context group are areas, and connections land on them. So
+        # both shapes go in the lookup, keyed by model ID and holding the diagram
+        # key, which differ for an area.
+        seen[mid] = key
 
     connections = []
     for c in spec["connections"]:
@@ -234,7 +264,10 @@ def cmd_diagram(args):
                 die(f"connection '{c['ref']}' references '{ref}', which is not placed on this diagram")
         # Anchors, line shape and label position are all computed by IcePanel from
         # the geometry. Only send an override the spec explicitly asked for.
-        conn = {"id": cid, "modelId": cid, "originId": origin, "targetId": target}
+        # The ends are diagram object keys, not model IDs — the two differ for an
+        # area, whose key carries an '-area' suffix.
+        conn = {"id": cid, "modelId": cid,
+                "originId": seen[origin], "targetId": seen[target]}
         for field in ("lineShape", "labelPosition", "originConnector", "targetConnector"):
             if c.get(field) is not None:
                 conn[field] = c[field]
