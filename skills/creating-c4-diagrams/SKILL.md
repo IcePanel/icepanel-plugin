@@ -29,14 +29,6 @@ export ICEPANEL_TOKEN='<key-id>:<secret>'
 curl -s -H "X-API-Key: $ICEPANEL_TOKEN" https://api.icepanel.io/v1/organizations
 ```
 
-For staging, set `ICEPANEL_API_BASE` — the script and your own curl calls both need it. Keys are environment-specific, so a production key 401s on staging:
-
-```bash
-export ICEPANEL_API_BASE='https://api.icepanel.dev'
-```
-
-Hand back `app.icepanel.dev` links to match.
-
 Everything is scoped to a landscape and a version: `/v1/landscapes/{landscapeId}/versions/{versionId}/...`. Use `latest` as the version unless the user names a snapshot.
 
 To create a landscape: `POST /v1/organizations/{orgId}/landscapes` with `{"name": "..."}`. The response includes the landscape and its initial version.
@@ -80,9 +72,42 @@ C4's abstractions nest: a software system is made of containers (applications an
 | Container (application) | `app` | `system` | A **runtime** boundary. Individually runnable and deployable. Web/mobile/desktop apps, services, serverless functions, batch jobs, shell scripts |
 | Container (data store) | `store` | `system` | Databases, caches, blob/content stores, file systems |
 | Component | `component` | `app` or `store` | Grouped functionality behind an interface, running **in the same process** as its container |
-| — | `group` | any | Purely visual clustering. Often used for deployment regions or nodes. |
+| — | `group` | `domain` or another `group` | Purely visual clustering. Often used for deployment regions, nodes or layers. Apps and stores **join** a group through `groupIds`, never `parentId` — see [Groups](#groups) |
 
 A JAR, DLL, assembly, package, namespace or folder is **not** a container and usually not a component. Those are organisational, not runtime, boundaries. Containers have nothing to do with Docker.
+
+### Groups
+
+A group is visual clustering: a deployment region, a node, a layer. It is the one type whose containment does **not** run through `parentId`, and assuming it does costs a failed import.
+
+- **A group's own `parentId` is a `domain` or another `group`** — never a `system`. Parenting a group to a system fails with `System is not allowed as a parent of group (allowed: domain, group)`.
+- **Apps and stores never parent to a group.** Their `parentId` stays the `system`; parenting one to a group fails with `Group is not allowed as a parent of store (allowed: system)`. They join a group through **`groupIds`**, a list that sits alongside the C4 hierarchy rather than inside it.
+
+So a group sits beside the system in the tree, while its members stay inside the system:
+
+```json
+{ "id": "g-region-primary", "name": "Primary Region", "type": "group", "parentId": "d-aws",
+  "caption": "Write and read region",
+  "description": "The primary region, and the only one that accepts writes." },
+
+{ "id": "g-data", "name": "Data Layer", "type": "group", "parentId": "g-region-primary",
+  "caption": "Authoritative projections",
+  "description": "The authoritative read and write models in the primary region." },
+
+{ "id": "store-single-view", "name": "Single View", "type": "store", "parentId": "s-platform",
+  "groupIds": ["g-data", "g-region-primary"],
+  "caption": "Consolidated read model",
+  "description": "One consolidated view of each business entity, served at low latency." }
+```
+
+`groupIds` accepts several groups, so **name every group whose boundary should enclose the object** rather than relying on the nesting to imply the outer one — that is why `store-single-view` above lists `g-data` and `g-region-primary` both. A group's area on a diagram is sized around the members it can see there, so an object that names only the inner group risks leaving the outer boundary empty on any diagram that draws it.
+
+Two import mechanics follow from groups being parented rather than referenced:
+
+- **A nested group cannot be created in the same request as its parent group.** The child fails with `Parent <x> not found` even when the parent sits earlier in the same file. Import groups in two passes: parent groups first, then the nested ones.
+- Because `parentId` resolves against the file alone, that second pass must **re-declare the parent group** next to the nested one. See [Step 3: import](#step-3-import).
+
+On a diagram a group is an `area`, exactly like a system boundary, and IcePanel insets each nesting level itself — see `references/layout.md`.
 
 Set `external: true` on third-party systems the user doesn't own (SaaS, identity providers, managed model endpoints). Externally-hosted services the system *does* own and control (its own S3 bucket, its own RDS instance) are its containers, not external systems.
 
@@ -108,7 +133,7 @@ Optional, and worth doing: the catalog has a technology for most languages, fram
 `fields` is required and shapes the response. Ask for the few that decide the choice. `name`, `description` and `websiteUrl` are what tell you whether a row is the technology you mean; add `restrictions` and `iconUrlLight`/`iconUrlDark` because the mechanics below depend on them. `id` always comes back. The rows come back under `catalogTechnologies`, not `technologies`.
 
 ```bash
-curl -sS -H "X-API-Key: $ICEPANEL_TOKEN" -G "$ICEPANEL_API_BASE/v1/catalog/technologies/select" \
+curl -sS -H "X-API-Key: $ICEPANEL_TOKEN" -G "https://api.icepanel.io/v1/catalog/technologies/select" \
   --data-urlencode 'search=postgres' --data-urlencode 'limit=5' \
   --data-urlencode 'fields[]=name' --data-urlencode 'fields[]=description' \
   --data-urlencode 'fields[]=websiteUrl' --data-urlencode 'fields[]=restrictions' \
@@ -158,9 +183,19 @@ The `id` on each entry is **your own key**, not IcePanel's. Import is an idempot
 
 `prune=true` **permanently deletes** everything absent from the file (limited to the namespace if set). Never pass it unless the user explicitly asks for a destructive sync.
 
-Import is asynchronous — poll `GET /import/{importId}` until `status` is `completed`, and read the `errors` array, which is where failures surface rather than in the initial response. It is **all or nothing**: one bad entity gives `status: error` and nothing lands, so a partial file that fails leaves the landscape untouched.
+Import is asynchronous — poll `GET /import/{importId}` until `status` is `completed` or `error`, and read the `errors` array, which is where failures surface rather than in the initial response. A failed import can still leave part of the file applied, so check `GET /model/objects` rather than assuming a clean slate.
 
 Re-importing a subset is fine but has two traps. `parentId` still resolves only within the file, so include the whole parent chain up to the `domain` — and when you rebuild that file from `GET /model/objects`, the domain's `import-original-id` sits on its `root` object, which you must write back as `type: "domain"`. Second, an omitted `icon` is **cleared**, while an omitted `caption`, `description` or `technologyIds` is preserved. Re-send the icon for every object you touch.
+
+**Nested groups need their own pass.** A group parented to another group fails with `Parent <x> not found` when both are created in the same request, even with the parent earlier in the array — and because that failure cascades to every object listing the nested group in `groupIds`, and to their components, it takes a large part of the file down with it. So when the model has groups inside groups, import in three passes:
+
+```bash
+python scripts/icepanel.py import <landscapeId> groups-top.json    # domain + top-level groups
+python scripts/icepanel.py import <landscapeId> groups-nested.json # nested groups, parents re-declared
+python scripts/icepanel.py import <landscapeId> model.json         # everything, groups included
+```
+
+Each pass re-declares the parents it hangs from, since `parentId` resolves against the file alone. Flat groups need none of this — one pass does it.
 
 ```bash
 python scripts/icepanel.py import <landscapeId> model.json

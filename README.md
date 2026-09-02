@@ -18,13 +18,13 @@ To try it from a local clone instead, point the marketplace at the checkout:
 
 If the install summary says `Run /reload-plugins to activate.`, run that too.
 
-## Plugins
+## Skills
 
-### icepanel
+### creating-c4-diagrams
 
-Builds and maintains C4 models in IcePanel through its REST API: model objects (actors, systems, apps, stores, components), connections, catalog technologies and icons, and Level 1/2/3 diagrams.
+Builds and maintains C4 models in IcePanel through its REST API — model objects (actors, systems, apps, stores, components), connections, catalog technologies and icons, and Level 1/2/3 diagrams with hand-authored layout.
 
-The `creating-c4-diagrams` skill helps you convert code or natural language into C4 model objects, connections, and diagrams using our API.
+It covers the parts that are easy to get wrong: that the model matters more than the diagrams, that a diagram is a story rather than a dump of every edge, that IcePanel has no auto-layout so placement is the whole job, and the places the published API docs disagree with the API.
 
 Includes a helper script for the mechanical work:
 
@@ -34,6 +34,12 @@ python scripts/icepanel.py idmap   <landscapeId>              # map import IDs t
 python scripts/icepanel.py diagram <landscapeId> l2.json      # create a diagram from a layout spec
 python scripts/icepanel.py verify  <landscapeId>              # check every diagram for layout problems
 ```
+
+### translating-context-maps
+
+Turns an image or sketch of a DDD [context map](https://github.com/ddd-crew/context-mapping) into IcePanel model objects and connections. Bounded contexts become a group with a system inside it, upstream/downstream relationships become connections, and the context map patterns — `OHS`, `PL`, `CF`, `ACL`, `SK`, `C/S`, `Partnership` become tags on those connections.
+
+It stops at the import file and hands off to `creating-c4-diagrams`, which does the importing and diagramming.
 
 ## Requirements
 
@@ -49,7 +55,7 @@ python scripts/icepanel.py verify  <landscapeId>              # check every diag
 
 ```
 .claude-plugin/marketplace.json          the marketplace catalog
-.claude-plugin/plugin.json               the IcePanel plugin manifest
+.claude-plugin/plugin.json               the plugin manifest
 skills/
   creating-c4-diagrams/
     SKILL.md
@@ -57,6 +63,10 @@ skills/
     references/layout.md                 grid, boundaries, line routing, spec format
     references/example.md                a worked three-level build
     scripts/icepanel.py
+  translating-context-maps/
+    SKILL.md
+    references/notation.md               the ddd-crew symbol set, and how sketches mislead
+    references/example.md                a worked translation, map to import file
 ```
 
 ## License

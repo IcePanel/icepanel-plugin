@@ -1,8 +1,8 @@
 {
   "name": "icepanel",
   "displayName": "IcePanel",
-  "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, and Level 1/2/3 diagrams.",
-  "version": "1.0.0",
+  "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, Level 1/2/3 diagrams, and DDD context maps translated from a sketch.",
+  "version": "1.1.0",
   "author": {
     "name": "IcePanel",
     "url": "https://icepanel.io"
@@ -13,6 +13,8 @@
     "c4 model",
     "architecture",
     "diagrams",
+    "ddd",
+    "context map",
     "devtools"
   ]
 }
