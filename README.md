@@ -1,22 +1,40 @@
-# IcePanel plugins
+# IcePanel plugin
 
-A Claude Code [plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) for working with IcePanel architecture landscapes.
+Claude Code and GitHub Copilot skills for working with IcePanel architecture landscapes.
+
+The repository keeps the canonical Claude skill source under `skills/` and includes
+the harness-specific manifests and skill copies required by GitHub Copilot discovery.
 
 ## Install
 
 ```
-/plugin marketplace add icepanel/icepanel-plugins
+/plugin marketplace add IcePanel/icepanel-plugin
 /plugin install icepanel@icepanel-plugins
 ```
 
 To try it from a local clone instead, point the marketplace at the checkout:
 
 ```
-/plugin marketplace add ./icepanel-plugins
+/plugin marketplace add ./icepanel-plugin
 /plugin install icepanel@icepanel-plugins
 ```
 
 If the install summary says `Run /reload-plugins to activate.`, run that too.
+
+## GitHub Copilot
+
+The repository includes a GitHub Copilot CLI plugin manifest at `plugin.json` and a
+marketplace catalog at `.github/plugin/marketplace.json`. The Copilot app and other
+project-integrated surfaces discover skills from `.github/skills/`:
+
+```
+.github/skills/creating-c4-diagrams/
+.github/skills/translating-context-maps/
+```
+
+The canonical skill source remains under `skills/` for the Claude plugin and CLI plugin.
+The `.github/skills/` copies are required because GitHub Copilot uses that documented
+project-skill location.
 
 ## Skills
 
@@ -56,6 +74,8 @@ It stops at the import file and hands off to `creating-c4-diagrams`, which does 
 ```
 .claude-plugin/marketplace.json          the marketplace catalog
 .claude-plugin/plugin.json               the plugin manifest
+.github/plugin/marketplace.json          the GitHub Copilot marketplace catalog
+plugin.json                              the GitHub Copilot CLI plugin manifest
 skills/
   creating-c4-diagrams/
     SKILL.md
@@ -67,6 +87,7 @@ skills/
     SKILL.md
     references/notation.md               the ddd-crew symbol set, and how sketches mislead
     references/example.md                a worked translation, map to import file
+.github/skills/                            GitHub Copilot app/project skills
 ```
 
 ## License
