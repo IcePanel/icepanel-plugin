@@ -1,0 +1,17 @@
+{
+  "name": "icepanel-plugins",
+  "description": "IcePanel agent skills for architecture modeling.",
+  "owner": {
+    "name": "IcePanel",
+    "url": "https://icepanel.io"
+  },
+  "plugins": [
+    {
+      "name": "icepanel",
+      "version": "1.1.0",
+      "source": ".",
+      "category": "architecture",
+      "description": "Build and maintain architecture models in IcePanel using C4 modeling and DDD context-map translation."
+    }
+  ]
+}
