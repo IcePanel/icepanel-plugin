@@ -8,10 +8,10 @@
   "plugins": [
     {
       "name": "icepanel",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "source": ".",
       "category": "architecture",
-      "description": "Build and maintain architecture models in IcePanel using C4 modeling and DDD context-map translation."
+      "description": "Build and maintain architecture models in IcePanel using C4 modeling, Mermaid C4 import, and DDD context-map translation."
     }
   ]
 }
