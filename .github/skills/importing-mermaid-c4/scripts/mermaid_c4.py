@@ -729,8 +729,15 @@ def is_ancestor(a, b, reg):
     return False
 
 
-def related(a, b, reg):
-    return is_ancestor(a, b, reg) or is_ancestor(b, a, reg)
+def nests(deep, shallow, reg):
+    """Is `deep` the same pair as `shallow`, or a zoom-in of it?
+
+    Both ends of `deep` must be the corresponding end of `shallow` or a
+    descendant of it. Deepening one end and shallowing the other is a
+    different relationship.
+    """
+    return (is_ancestor(shallow.origin, deep.origin, reg)
+            and is_ancestor(shallow.target, deep.target, reg))
 
 
 def norm_label(label):
@@ -740,11 +747,16 @@ def norm_label(label):
 def build_connections(blocks, reg, report):
     """One model connection per distinct relationship, shared across levels.
 
-    Two statements with the same label whose ends are hierarchically related
-    describe one relationship seen from two altitudes, so they collapse into a
-    single connection authored at the shallower pair — the level whose wording
-    the label suits. Each block's diagram still draws it against the objects
-    visible there.
+    A statement whose ends sit inside another statement's ends, with the same
+    label, is the same relationship at a lower altitude — but only when that
+    inner pair is the unique zoom-in of the outer one. Several child-level
+    `Uses` under one parent-level `Uses` are distinct relationships that share
+    a word, so they stay separate; merging them would leave a single connection
+    and, because diagram lines are keyed by that id, a single line. Identical
+    pairs always merge, and a unique chain (system, then app, then component)
+    still collapses, authored at the shallowest pair — the level whose wording
+    the label suits. Each block's diagram still draws a merged connection
+    against the objects visible there.
     """
     rels = [r for b in blocks for r in b.rels]
     for r in rels:
@@ -752,18 +764,68 @@ def build_connections(blocks, reg, report):
             if end not in reg:
                 report.add("problems", f"relationship references undeclared alias `{end}`")
 
-    groups = []
-    for r in rels:
-        if r.origin not in reg or r.target not in reg:
-            continue
-        for g in groups:
-            h = g[0]
-            if norm_label(h.label) == norm_label(r.label) and h.direction == r.direction \
-                    and related(h.origin, r.origin, reg) and related(h.target, r.target, reg):
-                g.append(r)
-                break
-        else:
-            groups.append([r])
+    valid = [r for r in rels if r.origin in reg and r.target in reg]
+    n = len(valid)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        a, b = find(i), find(j)
+        if a != b:
+            parent[b] = a
+
+    def same_rel(r, s):
+        return (norm_label(r.label) == norm_label(s.label)
+                and r.direction == s.direction)
+
+    def zoom_of(deep, shallow):
+        return same_rel(deep, shallow) and nests(deep, shallow, reg)
+
+    def same_ends(r, s):
+        return r.origin == s.origin and r.target == s.target
+
+    # Duplicate statements of the same pair are one connection.
+    for i in range(n):
+        for j in range(i + 1, n):
+            if same_rel(valid[i], valid[j]) and same_ends(valid[i], valid[j]):
+                union(i, j)
+
+    # Direct zoom-ins of i: strictly nested under i with nothing in between.
+    def via(parent_i, child_j):
+        p, c = valid[parent_i], valid[child_j]
+        for k, t in enumerate(valid):
+            if k == parent_i or k == child_j:
+                continue
+            if not (zoom_of(c, t) and zoom_of(t, p)):
+                continue
+            if same_ends(t, p) or same_ends(t, c):
+                continue
+            return True
+        return False
+
+    kids = [[] for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i == j or not zoom_of(valid[j], valid[i]) or same_ends(valid[j], valid[i]):
+                continue
+            if not via(i, j):
+                kids[i].append(j)
+
+    # Merge a parent with its child only when that child is unique. Several
+    # zoom-ins under one parent stay as separate connections.
+    for i, js in enumerate(kids):
+        if len({find(j) for j in js}) == 1:
+            union(i, js[0])
+
+    grouped = defaultdict(list)
+    for i, r in enumerate(valid):
+        grouped[find(i)].append(r)
+    groups = list(grouped.values())
 
     conns = []
     for g in groups:

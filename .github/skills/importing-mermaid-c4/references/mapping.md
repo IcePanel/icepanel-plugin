@@ -111,11 +111,15 @@ Merged blocks often state the same relationship at different altitudes:
 `Rel(customer, web_app, "Uses", "HTTPS")` in the container block, where `web_app` is a
 child of `SystemAA`.
 
-Where the label matches and one pair's ends are hierarchically related to the other's,
-that is **one relationship seen from two heights**, so it becomes one model
-connection. It is authored at the **shallowest** pair, because a label in that register
-belongs to the level it was written for. "Uses" is a business phrase and belongs on
-the L1. Each block's diagram still draws it against the objects visible there:
+If the labels match and one pair is the other opened up (`web_app` inside
+`SystemAA`), that is **one relationship seen from two heights**, so it becomes
+one model connection. That only holds when there is a single such pair. Three
+`Uses` from the same customer to three containers are three relationships that
+happen to share a word; they stay three.
+
+It is authored at the **shallowest** pair, because a label in that register
+belongs to the level it was written for. "Uses" is a business phrase and belongs
+on the L1. Each block's diagram still draws it against the objects visible there:
 `originId`/`targetId` are the objects on that diagram, `modelId` is the one shared
 connection. That is exactly how IcePanel's connection inheritance is meant to work.
 
