@@ -29,6 +29,7 @@ project-integrated surfaces discover skills from `.github/skills/`:
 
 ```
 .github/skills/creating-c4-diagrams/
+.github/skills/importing-mermaid-c4/
 .github/skills/translating-context-maps/
 ```
 
@@ -51,6 +52,18 @@ python scripts/icepanel.py import  <landscapeId> model.json   # upsert objects a
 python scripts/icepanel.py idmap   <landscapeId>              # map import IDs to IcePanel IDs
 python scripts/icepanel.py diagram <landscapeId> l2.json      # create a diagram from a layout spec
 python scripts/icepanel.py verify  <landscapeId>              # check every diagram for layout problems
+```
+
+### importing-mermaid-c4
+
+Turns Mermaid C4 diagrams (`C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment`) into IcePanel model objects, connections, and diagrams. It reconstructs the model from one or more blocks — aliases are the merge key — then confirms inferences with you before anything is written.
+
+It stops at a validated import file and diagram specs, then hands off to `creating-c4-diagrams` for import, drawing, and verification.
+
+Includes a helper script for the mechanical work:
+
+```bash
+python scripts/mermaid_c4.py parse docs/architecture.md --out mermaid-c4
 ```
 
 ### translating-context-maps
@@ -83,6 +96,12 @@ skills/
     references/layout.md                 grid, boundaries, line routing, spec format
     references/example.md                a worked three-level build
     scripts/icepanel.py
+  importing-mermaid-c4/
+    SKILL.md
+    references/mapping.md                element, boundary and relationship mapping
+    references/syntax.md                 the Mermaid C4 syntax the parser accepts
+    references/example.md                a worked import: two blocks to commands
+    scripts/mermaid_c4.py
   translating-context-maps/
     SKILL.md
     references/notation.md               the ddd-crew symbol set, and how sketches mislead
