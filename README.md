@@ -29,6 +29,7 @@ project-integrated surfaces discover skills from `.github/skills/`:
 
 ```
 .github/skills/creating-c4-diagrams/
+.github/skills/importing-structurizr-dsl/
 .github/skills/importing-mermaid-c4/
 .github/skills/translating-context-maps/
 ```
@@ -41,7 +42,7 @@ project-skill location.
 
 ### creating-c4-diagrams
 
-Builds and maintains C4 models in IcePanel through its REST API — model objects (actors, systems, apps, stores, components), connections, catalog technologies and icons, and Level 1/2/3 diagrams with hand-authored layout.
+Builds and maintains C4 models in IcePanel through its REST API: model objects (actors, systems, apps, stores, components), connections, catalog technologies and icons, and Level 1/2/3 diagrams with hand-authored layout.
 
 It covers the parts that are easy to get wrong: that the model matters more than the diagrams, that a diagram is a story rather than a dump of every edge, that IcePanel has no auto-layout so placement is the whole job, and the places the published API docs disagree with the API.
 
@@ -54,9 +55,23 @@ python scripts/icepanel.py diagram <landscapeId> l2.json      # create a diagram
 python scripts/icepanel.py verify  <landscapeId>              # check every diagram for layout problems
 ```
 
+### importing-structurizr-dsl
+
+Turns a Structurizr DSL workspace into IcePanel model objects, connections and diagrams. Structurizr is already model-first, so this is a translation rather than a reconstruction: the `model` block becomes the model, the `views` block becomes the diagrams.
+
+What is left is inference, and each call is confirmed with you before anything is written. Structurizr has one container type where IcePanel has two, no external flag, no software system above an `infrastructureNode`, and no layout to preserve.
+
+It reads a file, a directory (resolving `!include`), a URL or a pasted block, and never executes `!script` or `!plugin`. It stops at a validated import file and diagram specs, then hands off to `creating-c4-diagrams`.
+
+Includes a helper script for the mechanical work:
+
+```bash
+python scripts/structurizr_dsl.py parse workspace.dsl --out structurizr
+```
+
 ### importing-mermaid-c4
 
-Turns Mermaid C4 diagrams (`C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment`) into IcePanel model objects, connections, and diagrams. It reconstructs the model from one or more blocks — aliases are the merge key — then confirms inferences with you before anything is written.
+Turns Mermaid C4 diagrams (`C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment`) into IcePanel model objects, connections, and diagrams. It reconstructs the model from one or more blocks, where aliases are the merge key, then confirms inferences with you before anything is written.
 
 It stops at a validated import file and diagram specs, then hands off to `creating-c4-diagrams` for import, drawing, and verification.
 
@@ -68,7 +83,7 @@ python scripts/mermaid_c4.py parse docs/architecture.md --out mermaid-c4
 
 ### translating-context-maps
 
-Turns an image or sketch of a DDD [context map](https://github.com/ddd-crew/context-mapping) into IcePanel model objects and connections. Bounded contexts become a group with a system inside it, upstream/downstream relationships become connections, and the context map patterns — `OHS`, `PL`, `CF`, `ACL`, `SK`, `C/S`, `Partnership` become tags on those connections.
+Turns an image or sketch of a DDD [context map](https://github.com/ddd-crew/context-mapping) into IcePanel model objects and connections. Bounded contexts become a group with a system inside it, upstream/downstream relationships become connections, and the context map patterns (`OHS`, `PL`, `CF`, `ACL`, `SK`, `C/S`, `Partnership`) become tags on those connections.
 
 It stops at the import file and hands off to `creating-c4-diagrams`, which does the importing and diagramming.
 
@@ -96,6 +111,12 @@ skills/
     references/layout.md                 grid, boundaries, line routing, spec format
     references/example.md                a worked three-level build
     scripts/icepanel.py
+  importing-structurizr-dsl/
+    SKILL.md
+    references/mapping.md                element, group, relationship and view mapping
+    references/syntax.md                 the Structurizr DSL the parser accepts
+    references/example.md                a worked import of the Big Bank plc workspace
+    scripts/structurizr_dsl.py
   importing-mermaid-c4/
     SKILL.md
     references/mapping.md                element, boundary and relationship mapping
