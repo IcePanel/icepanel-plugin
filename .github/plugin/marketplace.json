@@ -11,7 +11,7 @@
       "version": "1.3.0",
       "source": ".",
       "category": "architecture",
-      "description": "Build and maintain architecture models in IcePanel using C4 modeling, Structurizr DSL and Mermaid C4 import, and DDD context-map translation."
+      "description": "Build and maintain software architecture in IcePanel. Import from code, Structurizr DSL, Mermaid C4, and DDD context-maps."
     }
   ]
 }

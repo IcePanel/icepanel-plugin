@@ -1,6 +1,6 @@
 {
   "name": "icepanel",
-  "description": "Build and maintain architecture models in IcePanel using the C4 model, Structurizr DSL and Mermaid C4 import, and DDD context-map translation.",
+  "description": "Build and maintain software architecture in IcePanel. Import from code, tructurizr DSL, Mermaid C4, and DDD context-maps.",
   "version": "1.3.0",
   "author": {
     "name": "IcePanel",
