@@ -117,6 +117,17 @@ def norm(text):
 
 # --------------------------------------------------------------------- lexing
 
+def _http_slashes(text, i):
+    """True when // at i is the separator in http:// or https://, not a comment."""
+    head = text[max(0, i - 6):i].lower()
+    if head.endswith("https:"):
+        return True
+    if head.endswith("http:"):
+        start = i - 5
+        return start <= 0 or not text[start - 1].isalnum()
+    return False
+
+
 def strip_comments(text):
     """Drop /* */, #, and // comments, leaving quoted strings and \"\"\" blocks alone."""
     out, i, n = [], 0, len(text)
@@ -136,7 +147,10 @@ def strip_comments(text):
         elif text.startswith("/*", i):
             j = text.find("*/", i + 2)
             i = n if j == -1 else j + 2
-        elif text.startswith("//", i) or text[i] == "#":
+        elif text.startswith("//", i) and not _http_slashes(text, i):
+            j = text.find("\n", i)
+            i = n if j == -1 else j
+        elif text[i] == "#":
             j = text.find("\n", i)
             i = n if j == -1 else j
         else:
@@ -399,8 +413,16 @@ class Parser:
 
         kind = ctx["kind"]
         if kind == "root" and kw == "workspace":
-            self.ws.name = toks[1] if len(toks) > 1 else None
-            self.ws.description = toks[2] if len(toks) > 2 else None
+            # `extends` is a keyword here, not the workspace name.
+            if len(toks) > 1 and toks[1].lower() == "extends":
+                target = toks[2] if len(toks) > 2 else ""
+                self.report.add("problems",
+                                f"`workspace extends{(' ' + target) if target else ''}` "
+                                f"— the base workspace is not pulled in, so its "
+                                f"elements are missing")
+            else:
+                self.ws.name = toks[1] if len(toks) > 1 else None
+                self.ws.description = toks[2] if len(toks) > 2 else None
             return self.block({"kind": "workspace"})
         if kind == "workspace":
             if kw == "model":
@@ -771,7 +793,29 @@ def load_inputs(paths, report):
     return "\n".join(chunks), base
 
 
-INCLUDE = re.compile(r"^[ \t]*!include[ \t]+(\S+)[ \t]*$", re.M | re.I)
+# A trailing #, //, or /* comment is valid and must not block inlining.
+# // inside http:// or https:// stays part of the path.
+INCLUDE = re.compile(
+    r"^[ \t]*!include[ \t]+"
+    r"(\"(?:[^\"\\]|\\.)*\"|[^\s#]+)"
+    r"[ \t]*(?:#.*|//.*|/\*.*)?$",
+    re.M | re.I,
+)
+
+
+def _include_target(raw):
+    """Path from an !include line, quotes and a glued comment removed."""
+    if len(raw) >= 2 and raw[0] == '"' and raw[-1] == '"':
+        return raw[1:-1].replace('\\"', '"')
+    i = 0
+    while i < len(raw):
+        if raw.startswith("/*", i):
+            return raw[:i].strip('"')
+        # :// is a URL scheme, not a comment. Any other // ends the path.
+        if raw.startswith("//", i) and (i == 0 or raw[i - 1] != ":"):
+            return raw[:i].strip('"')
+        i += 1
+    return raw.strip('"')
 
 
 def resolve_includes(text, base, report, depth=0):
@@ -781,7 +825,7 @@ def resolve_includes(text, base, report, depth=0):
         return text
 
     def repl(m):
-        target = m.group(1).strip('"')
+        target = _include_target(m.group(1))
         if target.startswith("http://") or target.startswith("https://"):
             try:
                 with urllib.request.urlopen(target, timeout=30) as r:
@@ -811,9 +855,18 @@ def resolve_includes(text, base, report, depth=0):
 # ------------------------------------------------------------- building model
 
 def store_tags(ws):
-    """Tags the styles block gives a data-store shape."""
-    return {norm(tag) for tag, props in ws.styles.items()
-            if norm(props.get("shape")) in STORE_SHAPES}
+    """Normalized tag -> shape, for tags the styles block marks as a data store.
+
+    Keys are folded with norm() because an element's tag and the styles key
+    often differ in case or internal whitespace. The shape is kept here so the
+    report does not look the element's original tag up in ws.styles.
+    """
+    found = {}
+    for tag, props in ws.styles.items():
+        shape = props.get("shape")
+        if norm(shape) in STORE_SHAPES:
+            found.setdefault(norm(tag), shape)
+    return found
 
 
 def notation_tags(ws):
@@ -871,7 +924,7 @@ def classify(ws, report):
             if hit:
                 e.type = "store"
                 report.add("stores", f"**{e.name}** → store, because tag `{hit}` is styled "
-                                     f"`shape {ws.styles[hit]['shape']}`")
+                                     f"`shape {stores[norm(hit)]}`")
             elif e.archetype and STORE_ARCHETYPE.search(words(e.archetype)):
                 e.type = "store"
                 report.add("stores", f"**{e.name}** → store, because it is declared with the "
@@ -946,8 +999,10 @@ def apply_instances(ws, pending, environment, split, report):
                            f"separate objects")
             continue
         # Splitting: the first instance keeps the original object and its connections.
+        # Copies keep the same model-level groups; only the node chain differs.
         stem, first = target.name, nodes[0]
-        target.groups = target.groups + group_chain(first)
+        existing = list(target.groups)
+        target.groups = existing + group_chain(first)
         target.name = f"{stem} ({first.name})"
         for n in nodes[1:]:
             copy = Elem(target.keyword, None)
@@ -957,7 +1012,7 @@ def apply_instances(ws, pending, environment, split, report):
             copy.tags = list(target.tags)
             copy.type = target.type
             copy.parent = target.parent
-            copy.groups = group_chain(n)
+            copy.groups = existing + group_chain(n)
             extra.append(copy)
             report.add("instances", f"**{copy.name}** split out from **{stem}** — it carries "
                                     f"no connections of its own")
@@ -1570,7 +1625,16 @@ def diagram_target(ws, view, scope, boxes, domain_eid, report):
 
 
 def owning_system(elem):
-    """The software system an element belongs to, or itself when it is one."""
+    """The software system an element belongs to, or itself when it is one.
+
+    An infrastructureNode is the exception: its parent chain runs up through
+    deployment nodes and never reaches a system, so the system inferred for it in
+    place_infrastructure is the answer. Walking the parents instead returns None,
+    which reads as "belongs to some other system" and drops it off its own
+    deployment diagram.
+    """
+    if elem.deploy_system is not None:
+        return elem.deploy_system
     cur = elem
     while cur is not None:
         if cur.type == "system":
@@ -1674,6 +1738,11 @@ def cmd_parse(args):
 
     domain_name = args.domain or ws.name
     if not domain_name:
+        extends = next((line for line in report.sections.get("problems", [])
+                        if line.startswith("`workspace extends")), None)
+        if extends:
+            raise DslError(f"{extends}. The workspace has no name to take the "
+                           f"domain from; pass --domain")
         raise DslError("the workspace has no name to take the domain from; pass --domain")
 
     environments = ws.environments
