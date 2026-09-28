@@ -1,8 +1,8 @@
 {
   "name": "icepanel",
   "displayName": "IcePanel",
-  "description": "Build and maintain your architecture model in IcePanel via its REST API: model objects, connections, technologies, Level 1/2/3 diagrams, Mermaid C4 import, and DDD context maps translated from a sketch.",
-  "version": "1.2.0",
+  "description": "Build and maintain software architecture in IcePanel. Import from code, Structurizr DSL, Mermaid C4, and DDD context-maps.",
+  "version": "1.3.0",
   "author": {
     "name": "IcePanel",
     "url": "https://icepanel.io"
@@ -15,6 +15,8 @@
     "diagrams",
     "ddd",
     "context map",
+    "structurizr",
+    "dsl",
     "mermaid",
     "devtools"
   ]

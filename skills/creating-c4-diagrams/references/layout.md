@@ -12,12 +12,22 @@ IcePanel has no auto-layout. Every object needs an explicit `x`/`y`, and the res
 
 ## Grid and sizing
 
-**`width` and `height` are optional — don't send them.** IcePanel applies its default box size, **256 × 128**. Send a size only when a box genuinely needs to be off-default; the numbers below assume the default, so an odd-sized box means doing the pitch maths yourself around it.
+**`width` and `height` are optional — don't send them.** IcePanel applies a default size, and the default is not the same for every type:
+
+| Object | Default size |
+| --- | --- |
+| `app`, `store`, `system`, `component` | 256 × 128 |
+| `actor` | 256 × 160 |
+| `group` | **512 × 384** |
+
+Send a size only when a box genuinely needs to be off-default; the numbers below assume the default, so an odd-sized box means doing the pitch maths yourself around it.
 
 Lay boxes out on a fixed pitch — the step from one box's top-left corner to the next, not the gap between them. Positions are then multiples of one number, so rows stay aligned:
 
 - horizontal pitch **384** = 256 box + 128 gutter → x = 0, 384, 768, …
 - vertical pitch **320** = 128 box + 192 gutter → y = 0, 320, 640, …
+
+**A group does not fit that pitch.** At 384 tall it is taller than the 320 step, so two groups one row apart overlap every time. Give a group two rows, a pitch of **640**, which leaves a 256 gutter. This is the one place where the standard pitch is wrong rather than merely tight, and `verify` catches it after the fact (`areas overlap: A / B`) rather than the API rejecting it.
 
 The vertical gutter is larger because it holds the connection labels, which IcePanel draws on the line. Short names (see the naming rule in `SKILL.md`) fit this pitch comfortably. Too little room and a label collides with the box below or with a parallel connection's label, which is the most common way these diagrams turn unreadable. The API won't catch it: the request validates and the picture is still a mess.
 
@@ -48,6 +58,22 @@ Set `x`/`y` to the top-left corner of the children it wraps: for children spanni
 An area uses the same `modelId` as the object it represents — the L2 boundary of a system carries that system's ID, while that same system may appear as a plain box on the L1.
 
 Keep objects that live outside the boundary (actors, external systems) clear of it, with a full gutter of space.
+
+IcePanel insets each nesting level itself, roughly 48px on each side and a little more above for the title, so nested areas need no manual padding. Give every area in a nest the same `x`/`y` as the innermost children and let it grow outwards.
+
+### A group is always an area, never a box
+
+`shape: "box"` on a `group` is accepted by the API and passes `verify`, and then **the app fails to open the diagram**. Areas are stored as a separate entry keyed `<modelId>-area`, and connections into them use that key; a group sent as a box is keyed by its bare model ID instead, which the renderer does not expect. There is no case where a group should be a box.
+
+### Childless groups
+
+An area is sized around the objects naming it in `groupIds`, plus about 48px each side, so a group with one 256 × 128 member comes out at 352 × 248.
+
+A group with no members, which is what an `infrastructureNode` or an empty deployment node becomes, has nothing to size around. It keeps the default 512 × 384 and renders as an empty labelled box, so give it the 640 pitch like any other group.
+
+Its parent still covers it. A parent is sized from its own members *and* from any child group's area, empty or not, so the nesting reads correctly. `verify` prints `encloses 0 object(s)` for the empty one because it counts non-area objects; that is information, not a failure.
+
+Where a childless group is really a running thing rather than a boundary, such as a load balancer or a DNS zone, model it as an `app` instead. Then it is an ordinary box, it joins its boundaries through `groupIds`, and none of the above applies.
 
 ## Line routing
 
